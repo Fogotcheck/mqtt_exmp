@@ -1,0 +1,6 @@
+build/**
+.vscode/**
+
+Chip/STM32F439ZITx/.cproject
+Chip/STM32F439ZITx/.mxproject
+Chip/STM32F439ZITx/.project
