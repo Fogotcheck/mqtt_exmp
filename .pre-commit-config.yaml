@@ -25,6 +25,9 @@ repos:
         args: [--format, parsable, --strict]
 exclude: |
     (?x)^(
-        Chip/STM32F439ZITx/.*|
-        Lib/FreeRTOS/.*
+        Chip/STM32F439ZITx/.* |
+        Lib/FreeRTOS/.* |
+        Lib/Lwip/target/phy/.* |
+        Lib/Lwip/opts/.* |
+        Lib/Lwip/target/.*
     )$
