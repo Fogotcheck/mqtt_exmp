@@ -1,75 +1,80 @@
-# **[Проект](https://github.com/Fogotcheck/)**
+# **[Project](https://github.com/Fogotcheck/mqtt_exmp.git)**
 
-## *Клонирование репозитория*
+## *Cloning the repository*
 
-Клонировать репозиторий вы можете следующим образом:
+You can clone the repository as follows:
 
 ```console
-git clone "https://github.com/Fogotcheck/stm32_cmake_build.git"
+git clone "https://github.com/Fogotcheck/mqtt_exmp.git"
 ```
 
-## *Структура проекта*
+## *Project structure*
 
 ```
-├── AppMain                                 // main.cpp
+├── AppMain                                 // AppMain.cpp
 |
 ├── Cmake
-|       ├── Toolchain                       // минимальный набор правил для сборки
-|       ├── Opts                            // дополнительные функции для сборки
-|       └── Utils                           // дополнительные утилиты настройки окружения
+|       ├── Toolchain                       // minimal set of build rules
+|       ├── Opts                            // additional build functions
+|       └── Utils                           // extra environment setup utilities
 |
-├── Chip                                    // платформозависимые библиотеки
+├── Chip                                    // platform-dependent libraries
 |       └── STM32F439ZITx
-|             ├── Core                      // ядро для чипа
+|             ├── Core                      // chip core
 |             ├── Drivers                   // HAL + CMSIS
-|             └── STM32F439ZITx.ioc         // файл автогенерации CubeMX
+|             └── STM32F439ZITx.ioc         // CubeMX auto-generation file
 |
-├── Lib                                     // библиотеки для проектов
+├── Lib                                     // project libraries
 |       ├── ...
-|       ├── FreeRTOS                        // как пример для сборки сторонних библиотек
-|       └── CMakeLists.txt                  // CMakeLists для сборки библиотек
+|       ├── FreeRTOS                        // example for building third-party libraries
+|       └── CMakeLists.txt                  // CMakeLists for building libraries
 |
 |
-├── CMakeLists.txt                          // основной файл для сборки проекта
+├── CMakeLists.txt                          // main project build file
 |
-└── README.md                               // Вы находитесь тут
+└── README.md                               // You are here
 
 ```
 
-## *Сборка проекта*
+## *Project build*
 
-### Настройка сборки проекта
-Сборка проекта основана на [Cmake](https://cmake.org/). Минимальные требования для настройки сборки проекта - являются указание toolchain:
+### Project build setup
+The project build is based on [CMake](https://cmake.org/). The minimum requirement for configuring the project build is specifying the toolchain:
 
 ```console
 CMAKE_TOOLCHAIN_FILE=./Cmake/Toolchain/Arm-none-eabi-toolchain.cmake
 ```
-Таким образом настройка проекта для сборки arm-none-eabi будет выглядеть:
+Thus, the project setup for arm-none-eabi build will look like:
 
 ```console
 cmake -DCMAKE_TOOLCHAIN_FILE=./Cmake/Toolchain/Arm-none-eabi-toolchain.cmake -B ./build
 ```
 
-### Дополнительные утилиты настройки проекта
+### Additional project setup utilities
 
-Утилита настройки [pre-commit](https://pre-commit.com)
+[pre-commit](https://pre-commit.com) setup utility
 
 ```console
 cmake --build ./build --target UTILS_BuildTest_VIRTUAL_ENV
 ```
 
-Утилита настройки редактора [vscode](https://code.visualstudio.com/)
+Editor setup utility for [vscode](https://code.visualstudio.com/)
 ```console
 cmake --build ./build --target UTILS_BuildTest_VSC_CONFIGURE
 ```
-### Сборка проекта
+### Building the project
 
-Сборка осуществляется командой:
+Build is performed with the command:
 
 ```console
 cmake --build ./build
 ```
 
-## *Дополнительные ссылки*
+## [Mosquitto](https://mosquitto.org/)
 
-* [Трэкер задач](https://github.com/Fogotcheck/)
+mosquitto -c ./mosquitto/mosquitto.conf
+
+
+## *Additional links*
+
+* [Issue tracker](https://github.com/Fogotcheck/mqtt_exmp/issues)
