@@ -5,7 +5,9 @@ add_library(${PROJECT_NAME}_LIB_INTERFACE INTERFACE)
 add_subdirectory(FreeRTOS)
 add_subdirectory(Lwip)
 add_subdirectory(Network)
+add_subdirectory(Logger)
 add_subdirectory(Services)
+
 
 target_link_libraries(
     ${PROJECT_NAME}_LIB_INTERFACE
@@ -14,4 +16,5 @@ target_link_libraries(
     Network
     Services
     UserServices
+    Logger
 )

@@ -9,7 +9,7 @@ FetchContent_MakeAvailable(Services)
 
 target_link_libraries(
     Services
-    ${PROJECT_NAME}_LIB_INTERFACE
+    ${PROJECT_NAME}_CHIP_INTERFACE
 )
 
 add_subdirectory(template)

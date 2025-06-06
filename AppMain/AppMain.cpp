@@ -8,11 +8,10 @@
 
 #include "lwip/netif.h"
 
+#include "Logger.h"
 #include "Network.h"
 #include "ServicesCore.h"
 #include "UserService.h"
-
-#define MQTT_MAX_TOPIC_ALIAS 100
 
 ServicesCore core;
 char ip[28] = { 0 };
@@ -26,11 +25,19 @@ void mqtt_pub_cb(void *arg, const char *topic, u32_t tot_len);
 int main(void)
 {
 	system_init();
+
+	MX_USART3_UART_Init();
+	extern UART_HandleTypeDef huart3;
+	logger_init(&huart3);
+
 	BaseType_t ret = xTaskCreate(MainThr, "MainTask", 500, NULL, 1, NULL);
 	if (ret != pdPASS) {
+		FERROR("Failed to create MainThr task: %ld", ret);
 		Error_Handler();
 	}
+
 	vTaskStartScheduler();
+	FERROR("Scheduler failed to start");
 	Error_Handler();
 }
 
@@ -40,12 +47,15 @@ void MainThr(__attribute__((unused)) void *arg)
 		Error_Handler();
 	}
 	static std::array<uint8_t, 256> request = {};
+
 	UserService userService;
 
 	try {
 		core.regService();
 		userService.regService();
 	} catch (const std::exception &e) {
+		FERROR("%s", e.what());
+		Error_Handler();
 	}
 
 	Network net;
@@ -77,6 +87,7 @@ void net_connect_cb(Network *pnet, mqtt_connection_status_t status)
 		pnet->mqtt.publish(ip, "Init", sizeof("Init"), 1, 0, nullptr,
 				   nullptr);
 		pnet->mqtt.subscribe(ip_wildcard, 1, nullptr, nullptr);
+		FINFO("Network connected: %s", ip);
 	}
 }
 
@@ -112,6 +123,8 @@ void mqtt_pub_cb(void *arg, const char *topic, u32_t tot_len)
 		head->len = tot_len;
 		head->hash = core.getHash(topic_hash_buf);
 	} while (0);
+	FINFO("MQTT topic: %s, hash: 0x%08lx, len: %u", topic + topic_offset,
+	      head->hash, head->len);
 }
 
 void mqtt_data_cb(void *arg, const u8_t *data, u16_t len, u8_t flags)
@@ -137,5 +150,6 @@ void mqtt_data_cb(void *arg, const u8_t *data, u16_t len, u8_t flags)
 							    sizeof(head->len)),
 				 queue);
 	} catch (const std::exception &e) {
+		FWARNING("Service call failed: %s", e.what());
 	}
 }
