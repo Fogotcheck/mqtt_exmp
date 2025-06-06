@@ -22,7 +22,6 @@ add_compile_options(
   -fdata-sections
   -ffunction-sections
   -Wall
-  -fno-exceptions
 )
 
 add_link_options(
