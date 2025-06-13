@@ -111,4 +111,5 @@ class mqttClient {
 	void setPass(const char *pass);
 
 	void setStatus(mqtt_connection_status_t st);
+	mqtt_connection_status_t getStatus();
 };

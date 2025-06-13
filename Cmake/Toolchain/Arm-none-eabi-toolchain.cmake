@@ -26,7 +26,7 @@ add_compile_options(
 
 add_link_options(
   --specs=nosys.specs
-  -Wl,-Map,${PROJECT_NAME}.map
+  -Wl,-Map=output.map,--cref,--print-memory-usage
   -Wl,--gc-sections
   -static
   -Wl,--start-group

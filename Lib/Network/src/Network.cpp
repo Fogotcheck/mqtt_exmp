@@ -58,6 +58,7 @@ int32_t Network::init(mqtt_incoming_publish_cb_t pub_cb,
 			break;
 
 		ret = -1;
+
 		if (pdPASS != xTaskCreate(NetworkThr, xNetTaskName, stackSize,
 					  this, priority, &taskHandle))
 			break;
@@ -100,13 +101,11 @@ int Network::eventHandle(EventBits_t Event)
 		break;
 	case MQTT_EVENT_LINK_UP:
 		break;
-	case MQTT_EVENT_LINK_DOWN:
-		break;
-	case MQTT_EVENT_ERRORS:
-		mqtt.disconnect();
-		break;
+
 	case LWIP_EVENT_FLAG_LINK_UP:
 		dhcp_start(&gnetif);
+	case MQTT_EVENT_ERRORS:
+	case MQTT_EVENT_LINK_DOWN:
 	case LWIP_EVENT_FLAG_LINK_DHCP:
 		mqtt.disconnect();
 		configDevID(&gnetif.ip_addr);
@@ -129,6 +128,16 @@ void Network::configDevID(ip4_addr_t *ip)
 		 ip4_addr2(ip), ip4_addr3(ip), ip4_addr4(ip));
 
 	mqtt.setClientId(dev);
+}
+
+void Network::lock(uint32_t timeout)
+{
+	ulTaskNotifyTake(pdTRUE, timeout);
+}
+
+void Network::unLock(TaskHandle_t TaskAHandle)
+{
+	xTaskNotifyGive(TaskAHandle);
 }
 
 void mqtt_connect_cb(mqtt_client_t *client, void *arg,

@@ -144,3 +144,8 @@ void mqttClient::setStatus(mqtt_connection_status_t st)
 {
 	status = st;
 }
+
+mqtt_connection_status_t mqttClient::getStatus(void)
+{
+	return status;
+}
