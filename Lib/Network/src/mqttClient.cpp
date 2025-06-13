@@ -144,3 +144,11 @@ void mqttClient::setStatus(mqtt_connection_status_t st)
 {
 	status = st;
 }
+
+mqtt_connection_status_t mqttClient::getStatus(void)
+{
+	if (mqtt_client_is_connected(client)) {
+		return status;
+	}
+	return MQTT_CONNECT_DISCONNECTED;
+}

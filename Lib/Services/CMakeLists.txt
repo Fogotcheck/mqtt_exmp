@@ -1,15 +1,19 @@
 cmake_minimum_required(VERSION 3.22)
 
-FetchContent_Declare(Services
-    GIT_REPOSITORY git@github.com:Fogotcheck/Services.git
-    GIT_TAG master
-)
+add_library(${PROJECT_NAME}_SERVICES_INTERFACE INTERFACE)
 
-FetchContent_MakeAvailable(Services)
+add_subdirectory(Base)
 
 target_link_libraries(
     Services
     ${PROJECT_NAME}_CHIP_INTERFACE
 )
 
-add_subdirectory(template)
+add_subdirectory(Core)
+
+target_link_libraries(
+    ${PROJECT_NAME}_SERVICES_INTERFACE
+    INTERFACE
+    Services
+    CoreService
+)

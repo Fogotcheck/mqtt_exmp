@@ -14,7 +14,6 @@ target_link_libraries(
     INTERFACE
     freertos_kernel
     Network
-    Services
-    UserServices
     Logger
+    ${PROJECT_NAME}_SERVICES_INTERFACE
 )
