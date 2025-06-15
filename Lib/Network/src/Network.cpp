@@ -1,104 +1,161 @@
+#include "cmsis_os2.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "event_groups.h"
+
 #include "Network.h"
+#include "lwip.h"
+#include "lwipEvents.h"
 
-int Network::clientInit(void)
+enum NET_EVENT_FLAG {
+	MQTT_EVENT_LINK_UP = (EventBits_t)(1 << 3),
+	MQTT_EVENT_LINK_DOWN = (EventBits_t)(1 << 4),
+	MQTT_EVENT_ERRORS = (EventBits_t)(1 << 5),
+	NETWORK_EVENTS_ALL =
+		(EventBits_t)(LWIP_EVENT_FLAG_LINK_UP |
+			      LWIP_EVENT_FLAG_LINK_DOWN |
+			      LWIP_EVENT_FLAG_LINK_DHCP | MQTT_EVENT_LINK_UP |
+			      MQTT_EVENT_LINK_DOWN | MQTT_EVENT_ERRORS),
+	NETWORK_EVENTS_COUNTER = ((sizeof(uint32_t) << 3) - 8),
+};
+
+extern struct netif gnetif;
+
+void mqtt_connect_cb(mqtt_client_t *client, void *arg,
+		     mqtt_connection_status_t status);
+
+Network::Network(void)
 {
-	mqtt = mqtt_client_new();
-	if (mqtt == nullptr)
-		return -1;
-
-	mqtt_set_inpub_callback(
-		mqtt,
-		[](void *arg, const char *topic, u32_t tot_len) {
-			static_cast<Network *>(arg)->mqtt_incoming_publish_cb(
-				arg, topic, tot_len);
-		},
-		[](void *arg, const u8_t *data, u16_t len, u8_t flags) {
-			static_cast<Network *>(arg)->mqtt_incoming_data_cb(
-				arg, data, len, flags);
-		},
-		LWIP_CONST_CAST(void *, &mqtt_info));
-	return 0;
+	pnetif = &gnetif;
+	MX_ETH_Init();
 }
 
 Network::~Network(void)
 {
-	if (mqtt) {
-		clientDisConnect();
-		mqtt_client_free(mqtt);
-		mqtt = nullptr;
+	HAL_ETH_DeInit(&heth);
+	if (taskHandle != NULL) {
+		vTaskDelete(taskHandle);
 	}
 }
 
-void Network::clientConnect(ip_addr_t brokerIP, u16_t brokerPort)
+void NetworkThr(void *arg)
 {
-	if (mqtt == nullptr) {
-		clientStatus = MQTT_CONNECT_DISCONNECTED;
-		return;
+	static_cast<Network *>(arg)->eventsThr();
+}
+
+int32_t Network::init(mqtt_incoming_publish_cb_t pub_cb,
+		      mqtt_incoming_data_cb_t data_cb,
+		      net_connect_cb_t pconnect_cb, void *arg)
+{
+	int32_t ret = -1;
+	do {
+		if ((ret = MX_LWIP_Init()))
+			break;
+
+		connect_cb = pconnect_cb;
+
+		if ((ret = mqtt.init(pub_cb, data_cb, arg)))
+			break;
+
+		ret = -1;
+
+		if (pdPASS != xTaskCreate(NetworkThr, xNetTaskName, stackSize,
+					  this, priority, &taskHandle))
+			break;
+		ret = 0;
+	} while (0);
+
+	return ret;
+}
+
+int Network::eventsThr(void)
+{
+	EventBits_t Event = 0;
+	EventBits_t Mask = 1;
+	while (1) {
+		Event = xEventGroupWaitBits(lwip_event_group,
+					    NETWORK_EVENTS_ALL, pdFALSE,
+					    pdFALSE, portMAX_DELAY);
+		Mask = 1;
+		for (uint8_t i = 0; i < NETWORK_EVENTS_COUNTER; i++) {
+			if (Event & Mask) {
+				if (this->eventHandle(Event & Mask)) {
+					/*! \todo add logs */
+					Error_Handler();
+				}
+			}
+			Mask <<= 1;
+		}
 	}
-
-	mqtt_client_connect(
-		mqtt, &brokerIP, brokerPort,
-		[](mqtt_client_t *client, void *arg,
-		   mqtt_connection_status_t status) {
-			static_cast<Network *>(arg)->mqtt_connect_cb(
-				client, arg, status);
-		},
-		LWIP_CONST_CAST(void *, &clientStatus), &mqtt_info);
+	return 0;
 }
 
-void Network::clientDisConnect(void)
+int Network::eventHandle(EventBits_t Event)
 {
-	mqtt_disconnect(mqtt);
-}
+	xEventGroupClearBits(lwip_event_group, Event);
 
-void Network::setClientName(const char *name)
-{
-	mqtt_info.client_user = name;
-}
+	switch (Event) {
+	case LWIP_EVENT_FLAG_LINK_DOWN:
+		mqtt.disconnect();
+		dhcp_stop(&gnetif);
+		break;
+	case MQTT_EVENT_LINK_UP:
+		break;
 
-void Network::setClientID(const char *id)
-{
-	mqtt_info.client_id = id;
-}
+	case LWIP_EVENT_FLAG_LINK_UP:
+		dhcp_start(&gnetif);
+	case MQTT_EVENT_ERRORS:
+	case MQTT_EVENT_LINK_DOWN:
+	case LWIP_EVENT_FLAG_LINK_DHCP:
+		mqtt.disconnect();
+		configDevID(&gnetif.ip_addr);
 
-void Network::setClientPass(const char *pass)
-{
-	mqtt_info.client_pass = pass;
-}
+		mqtt.connect(&mqtt.broker, MQTT_PORT, mqtt_connect_cb,
+			     static_cast<void *>(this));
+		break;
 
-void Network::clientSubscribe(const char *postfix, u8_t qos, err_t *status)
-{
-	if (mqtt == nullptr) {
-		*status = ERR_MEM;
-		return;
+	default:
+		return -1;
 	}
-
-	char topic[(MQTT_OUTPUT_RINGBUF_SIZE >> 1)] = {};
-	snprintf(topic, sizeof(topic), "%s/%s", mqtt_info.client_user, postfix);
-	mqtt_subscribe(
-		mqtt, topic, qos,
-		[](void *arg, err_t err) {
-			static_cast<Network *>(arg)->mqtt_request_cb(arg, err);
-		},
-		LWIP_CONST_CAST(void *, status));
+	return 0;
 }
 
-void Network::mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len,
-				    u8_t flags)
+void Network::configDevID(ip4_addr_t *ip)
 {
+	static char dev[28] = { 0 };
+
+	snprintf(dev, sizeof(dev), "dev_%u.%u.%u.%u", ip4_addr1(ip),
+		 ip4_addr2(ip), ip4_addr3(ip), ip4_addr4(ip));
+
+	mqtt.setClientId(dev);
 }
-void Network::mqtt_incoming_publish_cb(void *arg, const char *topic,
-				       u32_t tot_len)
+
+void Network::lock(uint32_t timeout)
 {
+	ulTaskNotifyTake(pdTRUE, timeout);
 }
-void Network::mqtt_request_cb(void *arg, err_t status)
+
+void Network::unLock(TaskHandle_t TaskAHandle)
 {
-	err_t *ret = (err_t *)arg;
-	*ret = status;
+	xTaskNotifyGive(TaskAHandle);
 }
-void Network::mqtt_connect_cb(mqtt_client_t *client, void *arg,
-			      mqtt_connection_status_t status)
+
+void mqtt_connect_cb(mqtt_client_t *client, void *arg,
+		     mqtt_connection_status_t status)
 {
-	mqtt_connection_status_t *stat = (mqtt_connection_status_t *)arg;
-	*stat = status;
+	Network *pnet = static_cast<Network *>(arg);
+	pnet->mqtt.setStatus(status);
+	switch (status) {
+	case MQTT_CONNECT_ACCEPTED:
+		osEventFlagsSet(lwip_event_group, MQTT_EVENT_LINK_UP);
+		break;
+	case MQTT_CONNECT_DISCONNECTED:
+		osEventFlagsSet(lwip_event_group, MQTT_EVENT_LINK_DOWN);
+		break;
+	default:
+		osEventFlagsSet(lwip_event_group, MQTT_EVENT_ERRORS);
+		break;
+	}
+	if (pnet->connect_cb)
+		pnet->connect_cb(pnet, status);
 }

@@ -22,12 +22,11 @@ add_compile_options(
   -fdata-sections
   -ffunction-sections
   -Wall
-  -fno-exceptions
 )
 
 add_link_options(
   --specs=nosys.specs
-  -Wl,-Map,${PROJECT_NAME}.map
+  -Wl,-Map=output.map,--cref,--print-memory-usage
   -Wl,--gc-sections
   -static
   -Wl,--start-group

@@ -70,6 +70,11 @@ Build is performed with the command:
 cmake --build ./build
 ```
 
+## [Mosquitto](https://mosquitto.org/)
+
+mosquitto -c ./mosquitto/mosquitto.conf
+
+
 ## *Additional links*
 
 * [Issue tracker](https://github.com/Fogotcheck/mqtt_exmp/issues)
